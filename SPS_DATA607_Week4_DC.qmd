@@ -1,0 +1,160 @@
+---
+title: "SPS_DATA607_Week4_DC"
+format: html
+editor: visual
+author: "David Chen"
+---
+
+## Project 1
+
+In this project, you’re given a text file with chess tournament results where the information has some structure. Your job is to create an R Markdown file that generates a .CSV file (that could for example be imported into a SQL database) with the following information for all of the players:
+
+**Player’s Name, Player’s State, Total Number of Points, Player’s Pre-Rating, and Average Pre Chess Rating of Opponents For the first player,**
+
+the information would be:
+
+**Gary Hua, ON, 6.0, 1794, 1605**
+
+***1605 was calculated by using the pre-tournament opponents’ ratings of 1436, 1563, 1600, 1610, 1649, 1663, 1716, and dividing by the total number of games played.*** If you have questions about the meaning of the data or the results, please post them on the discussion forum. Data science, like chess, is a game of back and forth… The chess rating system (invented by a Minnesota statistician named Arpad Elo) has been used in many other contexts, including assessing relative strength of employment candidates by human resource departments.
+
+## Approach
+
+Upload the text file to GitHub and load it into R. Examine the file structure. It seems that each row has a fixed number of characters, similar to a COBOL printout.
+
+For me, I need to review string operations in R. The first two rows are headers, and each record spans two lines of text. Each field is separated using the "\|" pipe character. and records are separated using "-".
+
+Converting this to a data frame will result in many columns.
+
+## Running Code
+
+```{r}
+url <- "https://raw.githubusercontent.com/dyc-sps/SPS_Data607_Week4/refs/heads/main/tournamentinfo.txt"
+
+
+```
+
+Load and install library readr
+
+```{r}
+# Load required library
+library(readr)
+
+# GitHub raw file URL
+url <- "https://raw.githubusercontent.com/dyc-sps/SPS_Data607_Week4/refs/heads/main/tournamentinfo.txt"
+
+# Read all lines
+lines <- readLines(url, warn=FALSE)
+
+# Skip first 3 lines for headers
+header_lines <- lines[1:3]
+#print(header_lines)
+data_lines <- lines[-c(1,2,3)]
+#print(data_lines)
+# Remove separator lines (lines that contain only "-")
+#data_lines <- data_lines[data_lines != "-"]
+data_lines <- data_lines[!grepl("^[-]+$", data_lines)]
+header_lines <- header_lines[!grepl("^[-]+$", header_lines)]
+#print(data_lines)
+# Number of records (2 lines per record)
+n <- length(data_lines) / 2
+
+# Initialize list to store records
+records <- list()
+
+# Process each record
+for (i in seq_len(n)) {
+  line1 <- strsplit(data_lines[2*i - 1], "\\|")[[1]] |> trimws()
+  line2 <- strsplit(data_lines[2*i], "\\|")[[1]] |> trimws()
+  
+  # Combine both lines into a single record
+  record <- c(line1, line2)
+  records[[i]] <- record
+}
+
+# Convert to data frame
+df <- do.call(rbind, records)
+df <- as.data.frame(df, stringsAsFactors = FALSE)
+
+# Use header lines for column names
+print(header_lines[1])
+header1 <- strsplit(header_lines[1], "\\|")[[1]] |> trimws()
+header1 <- header1[-length(header1)]
+#print(header1)
+header2 <- strsplit(header_lines[2], "\\|")[[1]] |> trimws()
+header2 <- header2[-length(header2)]
+#print(header2)
+colnames(df) <- c(header1, header2)
+
+# Save as CSV
+write.csv(df, "tournamentinfo.csv", row.names = FALSE)
+
+# View first few rows
+head(df)
+```
+
+Load library stringr to process string.
+
+```{r}
+library(stringr)
+df$R_number <- as.numeric(str_match(df[,12], "R:\\s*(\\d+)")[,2])
+head(df)
+```
+
+-   `R:` → skip everything before `R:`
+
+-   `\\s*` → optional spaces
+
+-   `(\\d+)` → capture the digits
+
+-   `[,2]` → extract captured digits leave out first 2 chrs
+
+```{r}
+df$avg_pre_r <- NA
+
+for (row_num in 1:nrow(df)){
+pre_r_num=0
+na_num=0
+
+for (col in 4:10){
+  
+  # from col 4 to col 10 , remove letter "W" "L" or others strings.
+  pair_num=str_match(df[,col], " \\s*(\\d+)")[,2]
+  # add row_num to only targeting single number and is.na function to work.
+  if(is.na(df[pair_num,"R_number"][row_num])) {  
+     na_num<-na_num+1
+   } else {
+    pre_r_num<-pre_r_num+df[pair_num,"R_number"][row_num]}
+    #print(df[pair_num,"R_number"][row_num])
+  
+  
+}
+#print(pre_r_num)
+#print(na_num)
+if (na_num ==0){ played_num = 7}else{played_num <- 7- na_num}
+avg_pre_r_num=round(pre_r_num/played_num,0)
+df[row_num,"avg_pre_r"]<-avg_pre_r_num
+#print(avg_pre_r_num)
+}
+```
+
+Basically finished all math calculation and reload to a new data set and export to a CSV file.
+
+```{r}
+newdf<-df[,c(1,2,11,3,21,22)]
+colnames(newdf)<- c("Pair_num","Player_Name","Player_State","Total_Pts","Pre_Rating","Average_Pre_Rating")
+head(newdf)
+
+```
+
+```{r}
+path <- getwd() #set to current working directory path
+write.csv(newdf, file.path(path, "project1.csv"))
+```
+
+## **Conclusion**
+
+This is similar to string processing in Python, though we need to examine the library for details. Leveraging ChatGPT for this type of task can save significant time when trying and fixing issues.
+
+### LLMS used:
+
+• OpenAI. (2025). ChatGPT (Version 5.2) \[Large language model\]. https://chat.openai.com. Accessed Feb 22, 2026.
